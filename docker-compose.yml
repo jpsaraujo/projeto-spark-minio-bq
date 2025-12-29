@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # --- MINIO: Object Storage ---
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  # --- SPARK MASTER ---
+  spark-master:
+    image: apache/spark:3.4.1
+    container_name: spark-master
+    user: root # Necessário para evitar problemas de permissão em volumes no Ubuntu
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      - SPARK_MODE=master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+
+  # --- SPARK WORKER ---
+  spark-worker:
+    image: apache/spark:3.4.1
+    container_name: spark-worker
+    user: root
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+
+volumes:
+  minio_data:
